@@ -1,0 +1,92 @@
+---
+resource_types:
+- name: kubernetes
+  type: docker-image
+  source:
+    repository: zlabjp/kubernetes-resource
+    tag: "1.9"
+
+resources:
+  - name: repo
+    type: git
+    source:
+      uri: https://github.com/making/hello-nodejs.git
+      branch: master
+  - name: docker
+    type: docker-image
+    source:
+      repository: ((harbor-hostname))/((harbor-project))/node-web-app
+      username: ((harbor-username))
+      password: ((harbor-password))
+  - name: k8s
+    type: kubernetes
+    source:
+      kubeconfig: ((kubeconfig))
+jobs:
+- name: unit-test
+  plan:
+    - aggregate:
+      - get: repo
+        trigger: true
+    - task: npm-test
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: node
+            tag: 8-alpine
+        inputs:
+        - name: repo
+        run:
+          path: sh
+          args:
+          - -c
+          - |
+            set -e
+            echo "Should be tested!"
+- name: docker-push
+  plan:
+  - aggregate:
+    - get: repo
+      passed:
+      - unit-test
+      trigger: true
+  - put: docker
+    params:
+      build: repo
+- name: deploy-k8s
+  plan:
+  - aggregate:
+    - get: repo
+      passed:
+      - docker-push
+      trigger: true
+    - get: docker
+      passed:
+      - docker-push
+  - task: update-k8s-manifest
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: ubuntu
+      inputs:
+      - name: repo
+      - name: docker
+      outputs:
+      - name: updated
+      run:
+        path: bash
+        args:
+        - -c
+        - |
+          set -e
+          DIGEST=`cat docker/digest`
+          sed "s/:latest/@${DIGEST}/g" repo/k8s/node-web-app.yml > updated/node-web-app.yml
+  - put: k8s
+    params:
+      kubectl: apply -f updated/node-web-app.yml
+      wait_until_ready: 60
+      wait_until_ready_selector: app=node-web-app

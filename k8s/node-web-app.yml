@@ -1,0 +1,42 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: node-web-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: node-web-app
+  ports:
+  - protocol: TCP
+    port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-web-app
+  template:
+    metadata:
+      labels:
+        app: node-web-app
+    spec:
+      imagePullSecrets:
+      - name: harbor-secret
+      containers:
+      - image: harbor-13-78-118-111.sslip.io/tmaki/node-web-app:latest
+        imagePullPolicy: Always
+        name: node-web-app
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          periodSeconds: 5

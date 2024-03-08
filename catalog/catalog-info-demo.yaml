@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: hello-nodejs
+  description: hello-nodejs
+  tags:
+    - nodejs
+    - web
+    - tanzu
+  annotations:
+    'backstage.io/kubernetes-label-selector': 'app.kubernetes.io/part-of=hello-nodejs'
+    'backstage.io/kubernetes-namespace': demo
+spec:
+  type: service
+  lifecycle: experimental
+  owner: demo
